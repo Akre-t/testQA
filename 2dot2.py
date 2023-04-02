@@ -10,3 +10,4 @@ print(first_response.url)
 print(sec_response.url)
 print(ch_response)
 
+print(len(response.history))
