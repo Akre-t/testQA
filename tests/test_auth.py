@@ -1,7 +1,9 @@
 import requests
 import pytest
+from lib.base_case import BaseCase
+from lib.assertions import Assertions
 
-class TestUserAuth:
+class TestUserAuth(BaseCase):
     exclude_params = [
         ("no_cookie"),
         ("no_token")
@@ -14,24 +16,23 @@ class TestUserAuth:
 
         response1 = requests.post("https://playground.learnqa.ru/api/user/login", data=data)
 
-        assert "auth_sid" in response1.cookies, "Здесь нет куки"
-        assert "x-csrf-token" in response1.headers, "Здесь нет токена в заголовках"
-        assert "user_id" in response1.json(), "Здесь нет ИД юзера"
+        self.auth_sid = self.get_cookie(response1, "auth_sid")
+        self.token = self.get_header(response1, "x_csrf_token")
+        self.user_id_from_auth_method = self.get_json_value(response1, "user_id")
 
-        self.auth_sid = response1.cookies.get("auth_sid")
-        self.token = response1.headers.get("x_csrf_token")
-        self.user_id_from_auth_method = response1.json()["user_id"]
     def test_auth_user(self):
         response2 = requests.get(
             "https://playground.learnqa.ru/api/user/auth",
-            headers={"x-csrf-token":self.token},
+            headers={"x_csrf_token":self.token},
             cookies={"auth_sid":self.auth_sid},
         )
 
-        assert "user_id" in response2.json(), "Во втором запросе нет ИД юзера "
-        user_id_from_check_method = response2.json()["user_id"]
-
-        assert self.user_id_from_auth_method == user_id_from_check_method, "ИД юзера из метода авторизации не совпадает с ИД юзера из метода проверки"
+        Assertions.assert_json_value_by_name(
+            response2,
+            "user_id",
+            self.user_id_from_auth_method,
+            "User id from auth method isnt equal to user id from check method"
+        )
 
     @pytest.mark.parametrize('condition', exclude_params)
     def test_negative_auth_check(self, condition):
@@ -47,8 +48,9 @@ class TestUserAuth:
                 cookies= {"auth_sid" : self.auth_sid}
             )
 
-        assert "user_id" in response2.json(), "Здесь нет ИД юзера во втором запросе"
-
-        user_id_from_check_method = response2.json()["user_id"]
-
-        assert user_id_from_check_method == 0, f"Пользователь авторизован со следующими параметрами {condition}"
+        Assertions.assert_json_value_by_name(
+            response2,
+            "user_id",
+            0,
+            f"Пользователь авторизован со следующими параметрами {condition}"
+        )
